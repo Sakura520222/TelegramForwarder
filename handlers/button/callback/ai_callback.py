@@ -375,3 +375,313 @@ async def callback_summary_now(event, rule_id, session, message, data):
         session.close()
     
     return
+
+
+async def callback_toggle_weekly_summary(event, rule_id, session, message, data):
+    """处理切换周报总结的回调"""
+    logger.info(f"处理切换周报总结回调 - rule_id: {rule_id}")
+    
+    try:
+        rule = session.query(ForwardRule).get(int(rule_id))
+        if not rule:
+            await event.answer("规则不存在")
+            return
+        
+        # 切换周报总结状态
+        rule.is_weekly_summary = not rule.is_weekly_summary
+        session.commit()
+        logger.info(f"已切换规则 {rule_id} 的周报总结状态为: {rule.is_weekly_summary}")
+        
+        # 检查是否启用了同步功能
+        if rule.enable_sync:
+            logger.info(f"规则 {rule.id} 启用了同步功能，正在同步周报总结设置到关联规则")
+            # 获取需要同步的规则列表
+            sync_rules = session.query(RuleSync).filter(RuleSync.rule_id == rule.id).all()
+            
+            # 为每个同步规则应用相同的周报总结设置
+            for sync_rule in sync_rules:
+                sync_rule_id = sync_rule.sync_rule_id
+                logger.info(f"正在同步周报总结设置到规则 {sync_rule_id}")
+                
+                # 获取同步目标规则
+                target_rule = session.query(ForwardRule).get(sync_rule_id)
+                if not target_rule:
+                    logger.warning(f"同步目标规则 {sync_rule_id} 不存在，跳过")
+                    continue
+                
+                # 更新同步目标规则的周报总结设置
+                try:
+                    old_target_weekly_summary = target_rule.is_weekly_summary
+                    target_rule.is_weekly_summary = rule.is_weekly_summary
+                    logger.info(f"同步规则 {sync_rule_id} 的周报总结状态从 {old_target_weekly_summary} 到 {rule.is_weekly_summary}")
+                except Exception as e:
+                    logger.error(f"同步周报总结设置到规则 {sync_rule_id} 时出错: {str(e)}")
+                    continue
+            
+            # 提交所有同步更改
+            session.commit()
+            logger.info("所有同步周报总结更改已提交")
+        
+        # 如果周报总结功能已开启，重新调度任务
+        if rule.is_weekly_summary:
+            logger.info("规则已启用周报总结功能，开始更新调度任务")
+            main = await get_main_module()
+            if hasattr(main, 'scheduler') and main.scheduler:
+                await main.scheduler.schedule_rule(rule)
+                logger.info("周报总结调度任务更新成功")
+            else:
+                logger.warning("调度器未初始化")
+        else:
+            logger.info("规则未启用周报总结功能，跳过调度任务更新")
+        
+        # 返回到 AI 设置页面
+        await event.edit(await get_ai_settings_text(rule), buttons=await create_ai_settings_buttons(rule))
+        
+    except Exception as e:
+        logger.error(f"切换周报总结状态时出错: {str(e)}")
+        logger.error(traceback.format_exc())
+        await event.answer(f"处理时出错: {str(e)}")
+    finally:
+        session.close()
+    
+    return
+
+
+async def callback_set_weekly_summary_day(event, rule_id, session, message, data):
+    """处理设置周报总结日的回调"""
+    logger.info(f"处理设置周报总结日回调 - rule_id: {rule_id}")
+    
+    try:
+        rule = session.query(ForwardRule).get(int(rule_id))
+        if not rule:
+            await event.answer("规则不存在")
+            return
+        
+        # 创建周报总结日选择按钮
+        buttons = []
+        days = [
+            (1, "周一"),
+            (2, "周二"),
+            (3, "周三"),
+            (4, "周四"),
+            (5, "周五"),
+            (6, "周六"),
+            (7, "周日")
+        ]
+        
+        for day_num, day_name in days:
+            buttons.append([
+                Button.inline(
+                    f"{day_name}",
+                    f"select_weekly_summary_day:{rule_id}:{day_num}"
+                )
+            ])
+        
+        buttons.append([Button.inline("取消", f"ai_settings:{rule_id}")])
+        
+        await event.edit(
+            f"请选择周报总结日（当前: {days[rule.weekly_summary_day - 1][1]}）",
+            buttons=buttons
+        )
+        
+    except Exception as e:
+        logger.error(f"设置周报总结日时出错: {str(e)}")
+        logger.error(traceback.format_exc())
+        await event.answer(f"处理时出错: {str(e)}")
+    finally:
+        session.close()
+    
+    return
+
+
+async def callback_select_weekly_summary_day(event, rule_id, session, message, data):
+    """处理选择周报总结日的回调"""
+    parts = data.split(':', 2)
+    if len(parts) == 3:
+        _, rule_id, day = parts
+        logger.info(f"设置规则 {rule_id} 的周报总结日为: {day}")
+        
+        try:
+            rule = session.query(ForwardRule).get(int(rule_id))
+            if rule:
+                # 记录旧日
+                old_day = rule.weekly_summary_day
+                
+                # 更新日
+                rule.weekly_summary_day = int(day)
+                session.commit()
+                logger.info(f"数据库更新成功: {old_day} -> {day}")
+                
+                # 检查是否启用了同步功能
+                if rule.enable_sync:
+                    logger.info(f"规则 {rule.id} 启用了同步功能，正在同步周报总结日设置到关联规则")
+                    # 获取需要同步的规则列表
+                    sync_rules = session.query(RuleSync).filter(RuleSync.rule_id == rule.id).all()
+                    
+                    # 为每个同步规则应用相同的周报总结日设置
+                    for sync_rule in sync_rules:
+                        sync_rule_id = sync_rule.sync_rule_id
+                        logger.info(f"正在同步周报总结日到规则 {sync_rule_id}")
+                        
+                        # 获取同步目标规则
+                        target_rule = session.query(ForwardRule).get(sync_rule_id)
+                        if not target_rule:
+                            logger.warning(f"同步目标规则 {sync_rule_id} 不存在，跳过")
+                            continue
+                        
+                        # 更新同步目标规则的周报总结日设置
+                        try:
+                            old_target_day = target_rule.weekly_summary_day
+                            target_rule.weekly_summary_day = int(day)
+                            logger.info(f"同步规则 {sync_rule_id} 的周报总结日从 {old_target_day} 到 {day}")
+                        except Exception as e:
+                            logger.error(f"同步周报总结日到规则 {sync_rule_id} 时出错: {str(e)}")
+                            continue
+                    
+                    # 提交所有同步更改
+                    session.commit()
+                    logger.info("所有同步周报总结日更改已提交")
+                
+                # 如果周报总结功能已开启，重新调度任务
+                if rule.is_weekly_summary:
+                    logger.info("规则已启用周报总结功能，开始更新调度任务")
+                    main = await get_main_module()
+                    if hasattr(main, 'scheduler') and main.scheduler:
+                        await main.scheduler.schedule_rule(rule)
+                        logger.info("周报总结调度任务更新成功")
+                    else:
+                        logger.warning("调度器未初始化")
+                else:
+                    logger.info("规则未启用周报总结功能，跳过调度任务更新")
+                
+                # 返回到 AI 设置页面
+                await event.edit(await get_ai_settings_text(rule), buttons=await create_ai_settings_buttons(rule))
+                
+        except Exception as e:
+            logger.error(f"设置周报总结日时出错: {str(e)}")
+            logger.error(traceback.format_exc())
+        finally:
+            session.close()
+    
+    return
+
+
+async def callback_set_weekly_summary_time(event, rule_id, session, message, data):
+    """处理设置周报总结时间的回调"""
+    logger.info(f"处理设置周报总结时间回调 - rule_id: {rule_id}")
+    
+    try:
+        rule = session.query(ForwardRule).get(int(rule_id))
+        if not rule:
+            await event.answer("规则不存在")
+            return
+        
+        # 使用现有的总结时间选择功能
+        await event.edit("请选择周报总结时间：", buttons=await create_summary_time_buttons(rule_id, page=0, is_weekly=True))
+        
+    except Exception as e:
+        logger.error(f"设置周报总结时间时出错: {str(e)}")
+        logger.error(traceback.format_exc())
+        await event.answer(f"处理时出错: {str(e)}")
+    finally:
+        session.close()
+    
+    return
+
+
+async def callback_select_weekly_summary_time(event, rule_id, session, message, data):
+    """处理选择周报总结时间的回调"""
+    parts = data.split(':', 2)
+    if len(parts) == 3:
+        _, rule_id, time = parts
+        logger.info(f"设置规则 {rule_id} 的周报总结时间为: {time}")
+        
+        try:
+            rule = session.query(ForwardRule).get(int(rule_id))
+            if rule:
+                # 记录旧时间
+                old_time = rule.weekly_summary_time
+                
+                # 更新时间
+                rule.weekly_summary_time = time
+                session.commit()
+                logger.info(f"数据库更新成功: {old_time} -> {time}")
+                
+                # 检查是否启用了同步功能
+                if rule.enable_sync:
+                    logger.info(f"规则 {rule.id} 启用了同步功能，正在同步周报总结时间设置到关联规则")
+                    # 获取需要同步的规则列表
+                    sync_rules = session.query(RuleSync).filter(RuleSync.rule_id == rule.id).all()
+                    
+                    # 为每个同步规则应用相同的周报总结时间设置
+                    for sync_rule in sync_rules:
+                        sync_rule_id = sync_rule.sync_rule_id
+                        logger.info(f"正在同步周报总结时间到规则 {sync_rule_id}")
+                        
+                        # 获取同步目标规则
+                        target_rule = session.query(ForwardRule).get(sync_rule_id)
+                        if not target_rule:
+                            logger.warning(f"同步目标规则 {sync_rule_id} 不存在，跳过")
+                            continue
+                        
+                        # 更新同步目标规则的周报总结时间设置
+                        try:
+                            old_target_time = target_rule.weekly_summary_time
+                            target_rule.weekly_summary_time = time
+                            logger.info(f"同步规则 {sync_rule_id} 的周报总结时间从 {old_target_time} 到 {time}")
+                        except Exception as e:
+                            logger.error(f"同步周报总结时间到规则 {sync_rule_id} 时出错: {str(e)}")
+                            continue
+                    
+                    # 提交所有同步更改
+                    session.commit()
+                    logger.info("所有同步周报总结时间更改已提交")
+                
+                # 如果周报总结功能已开启，重新调度任务
+                if rule.is_weekly_summary:
+                    logger.info("规则已启用周报总结功能，开始更新调度任务")
+                    main = await get_main_module()
+                    if hasattr(main, 'scheduler') and main.scheduler:
+                        await main.scheduler.schedule_rule(rule)
+                        logger.info("周报总结调度任务更新成功")
+                    else:
+                        logger.warning("调度器未初始化")
+                else:
+                    logger.info("规则未启用周报总结功能，跳过调度任务更新")
+                
+                # 返回到 AI 设置页面
+                await event.edit(await get_ai_settings_text(rule), buttons=await create_ai_settings_buttons(rule))
+                
+        except Exception as e:
+            logger.error(f"设置周报总结时间时出错: {str(e)}")
+            logger.error(traceback.format_exc())
+        finally:
+            session.close()
+    
+    return
+
+
+async def callback_weekly_time_page(event, rule_id, session, message, data):
+    """处理周报总结时间翻页的回调"""
+    parts = data.split(':', 2)
+    if len(parts) == 3:
+        _, rule_id, page = parts
+        logger.info(f"处理周报总结时间翻页 - rule_id: {rule_id}, page: {page}")
+        
+        try:
+            rule = session.query(ForwardRule).get(int(rule_id))
+            if not rule:
+                await event.answer("规则不存在")
+                return
+            
+            # 更新页面显示
+            await event.edit("请选择周报总结时间：", buttons=await create_summary_time_buttons(rule_id, page=int(page), is_weekly=True))
+            
+        except Exception as e:
+            logger.error(f"处理周报总结时间翻页时出错: {str(e)}")
+            logger.error(traceback.format_exc())
+            await event.answer(f"处理时出错: {str(e)}")
+        finally:
+            session.close()
+    
+    return

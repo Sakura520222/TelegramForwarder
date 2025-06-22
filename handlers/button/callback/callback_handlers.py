@@ -654,6 +654,13 @@ CALLBACK_HANDLERS = {
     'cancel_set_prompt': callback_cancel_set_prompt,
     'cancel_set_summary': callback_cancel_set_summary,
     'summary_now':callback_summary_now,
+    # 周报总结设置
+    'toggle_weekly_summary': callback_toggle_weekly_summary,
+    'set_weekly_summary_day': callback_set_weekly_summary_day,
+    'select_weekly_summary_day': callback_select_weekly_summary_day,
+    'set_weekly_summary_time': callback_set_weekly_summary_time,
+    'select_weekly_summary_time': callback_select_weekly_summary_time,
+    'weekly_time_page': callback_weekly_time_page,
     # 媒体设置
     'select_max_media_size': callback_select_max_media_size,
     'set_max_media_size': callback_set_max_media_size,

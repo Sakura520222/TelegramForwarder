@@ -24,3 +24,7 @@ class AddMode(enum.Enum):
 class HandleMode(enum.Enum):
     FORWARD = 'FORWARD'
     EDIT = 'EDIT'
+
+class SummaryMode(enum.Enum):
+    DAILY = 'daily'  # 每日总结
+    WEEKLY = 'weekly'  # 周报总结

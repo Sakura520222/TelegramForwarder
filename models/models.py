@@ -70,6 +70,10 @@ class ForwardRule(Base):
     summary_prompt = Column(String, nullable=True)  # AI总结的prompt
     is_keyword_after_ai = Column(Boolean, default=False) # AI处理后是否再次执行关键字过滤
     is_top_summary = Column(Boolean, default=True) # 是否顶置总结消息
+    # 周报总结相关字段
+    is_weekly_summary = Column(Boolean, default=False)  # 是否启用周报总结
+    weekly_summary_day = Column(Integer, default=1)  # 周报总结日 (1-7, 1=周一, 7=周日)
+    weekly_summary_time = Column(String(5), default=os.getenv('DEFAULT_WEEKLY_SUMMARY_TIME', '09:00'))  # 周报总结时间
     enable_delay = Column(Boolean, default=False)  # 是否启用延迟处理
     delay_seconds = Column(Integer, default=5)  # 延迟处理秒数
     # RSS相关字段
@@ -365,6 +369,9 @@ def migrate_db(engine):
         'enable_only_push': 'ALTER TABLE forward_rules ADD COLUMN enable_only_push BOOLEAN DEFAULT FALSE',
         'media_allow_text': 'ALTER TABLE forward_rules ADD COLUMN media_allow_text BOOLEAN DEFAULT FALSE',
         'enable_ai_upload_image': 'ALTER TABLE forward_rules ADD COLUMN enable_ai_upload_image BOOLEAN DEFAULT FALSE',
+        'is_weekly_summary': 'ALTER TABLE forward_rules ADD COLUMN is_weekly_summary BOOLEAN DEFAULT FALSE',
+        'weekly_summary_day': 'ALTER TABLE forward_rules ADD COLUMN weekly_summary_day INTEGER DEFAULT 1',
+        'weekly_summary_time': 'ALTER TABLE forward_rules ADD COLUMN weekly_summary_time VARCHAR DEFAULT "09:00"',
     }
 
     keywords_new_columns = {

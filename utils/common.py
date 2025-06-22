@@ -236,10 +236,12 @@ async def get_ai_settings_text(rule):
     """生成AI设置页面的文本"""
     ai_prompt = rule.ai_prompt or os.getenv('DEFAULT_AI_PROMPT', '未设置')
     summary_prompt = rule.summary_prompt or os.getenv('DEFAULT_SUMMARY_PROMPT', '未设置')
+    weekly_summary_prompt = rule.summary_prompt or os.getenv('DEFAULT_WEEKLY_SUMMARY_PROMPT', '未设置')
 
     return AI_SETTINGS_TEXT.format(
         ai_prompt=ai_prompt,
-        summary_prompt=summary_prompt
+        summary_prompt=summary_prompt,
+        weekly_summary_prompt=weekly_summary_prompt
     )
 
 async def get_sender_info(event, rule_id):

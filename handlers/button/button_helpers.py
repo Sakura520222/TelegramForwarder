@@ -202,8 +202,14 @@ async def create_model_buttons(rule_id, page=0):
     return buttons
 
 
-async def create_summary_time_buttons(rule_id, page=0):
-    """创建时间选择按钮"""
+async def create_summary_time_buttons(rule_id, page=0, is_weekly=False):
+    """创建时间选择按钮
+    
+    Args:
+        rule_id: 规则ID
+        page: 页码
+        is_weekly: 是否为周报总结时间选择
+    """
     # 从环境变量获取布局设置
     rows = SUMMARY_TIME_ROWS
     cols = SUMMARY_TIME_COLS
@@ -221,9 +227,15 @@ async def create_summary_time_buttons(rule_id, page=0):
     # 添加时间按钮
     current_row = []
     for i, time in enumerate(SUMMARY_TIMES[start_idx:end_idx], start=1):
+        # 根据是否为周报总结选择不同的回调
+        if is_weekly:
+            callback_data = f"select_weekly_summary_time:{rule_id}:{time}"
+        else:
+            callback_data = f"select_time:{rule_id}:{time}"
+        
         current_row.append(Button.inline(
             time,
-            f"select_time:{rule_id}:{time}"
+            callback_data
         ))
 
         # 当达到每行的列数时，添加当前行并重置
@@ -238,10 +250,16 @@ async def create_summary_time_buttons(rule_id, page=0):
     # 添加导航按钮
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(Button.inline(
-            "⬅️ 上一页",
-            f"time_page:{rule_id}:{page - 1}"
-        ))
+        if is_weekly:
+            nav_buttons.append(Button.inline(
+                "⬅️ 上一页",
+                f"weekly_time_page:{rule_id}:{page - 1}"
+            ))
+        else:
+            nav_buttons.append(Button.inline(
+                "⬅️ 上一页",
+                f"time_page:{rule_id}:{page - 1}"
+            ))
 
     nav_buttons.append(Button.inline(
         f"{page + 1}/{(total_times + times_per_page - 1) // times_per_page}",
@@ -249,10 +267,16 @@ async def create_summary_time_buttons(rule_id, page=0):
     ))
 
     if end_idx < total_times:
-        nav_buttons.append(Button.inline(
-            "下一页 ➡️",
-            f"time_page:{rule_id}:{page + 1}"
-        ))
+        if is_weekly:
+            nav_buttons.append(Button.inline(
+                "下一页 ➡️",
+                f"weekly_time_page:{rule_id}:{page + 1}"
+            ))
+        else:
+            nav_buttons.append(Button.inline(
+                "下一页 ➡️",
+                f"time_page:{rule_id}:{page + 1}"
+            ))
 
     buttons.append(nav_buttons)
     buttons.append([

@@ -280,6 +280,38 @@ AI_SETTINGS = {
         'display_name': '立即执行总结',
         'toggle_action': 'summary_now',
         'toggle_func': None
+    },
+    'is_weekly_summary': {
+        'display_name': '周报总结',
+        'values': {
+            True: '开启',
+            False: '关闭'
+        },
+        'toggle_action': 'toggle_weekly_summary',
+        'toggle_func': lambda current: not current
+    },
+    'weekly_summary_day': {
+        'display_name': '周报总结日',
+        'values': {
+            1: '周一',
+            2: '周二',
+            3: '周三',
+            4: '周四',
+            5: '周五',
+            6: '周六',
+            7: '周日'
+        },
+        'toggle_action': 'set_weekly_summary_day',
+        'toggle_func': None
+    },
+    'weekly_summary_time': {
+        'display_name': '周报总结时间',
+        'values': {
+            None: '09:00',
+            '': '09:00'
+        },
+        'toggle_action': 'set_weekly_summary_time',
+        'toggle_func': None
     }
 
 }
